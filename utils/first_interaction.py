@@ -29,6 +29,17 @@ def remove_html_comments(body: str) -> str:
     return re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL).strip()
 
 
+def format_with_prettier(code: str, parser: str = "markdown") -> str:
+    """Formats a string using Prettier with the specified parser."""
+    result = subprocess.run(
+        ["npx", "prettier", "--stdin", "--parser", parser],
+        input=code.encode("utf-8"),
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout.decode("utf-8")
+
+
 def get_completion(messages: list) -> str:
     """Get completion from OpenAI or Azure OpenAI."""
     if AZURE_API_KEY and AZURE_ENDPOINT:
@@ -43,7 +54,7 @@ def get_completion(messages: list) -> str:
 
     r = requests.post(url, headers=headers, json=data)
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    return format_with_prettier(r.json()["choices"][0]["message"]["content"].strip())
 
 
 def get_pr_diff(pr_number):
@@ -391,7 +402,6 @@ INSTRUCTIONS:
 - INCLUDE ALL LINKS AND INSTRUCTIONS IN THE EXAMPLE BELOW, customized as appropriate
 - In your response mention to the user that this is an automated response and that an Ultralytics engineer will also assist soon
 - Do not add a sign-off or valediction like "best regards" at the end of your response
-- Do not add spaces between bullet points or numbered lists
 - Only link to files or URLs in the example below, do not add external links
 - Use a few emojis to enliven your response
 
