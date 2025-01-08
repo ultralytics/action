@@ -88,6 +88,7 @@ ultralytics-actions-summarize-pr = "actions.summarize_pr:main"
 ultralytics-actions-summarize-release = "actions.summarize_release:main"
 ultralytics-actions-update-markdown-code-blocks = "actions.update_markdown_code_blocks:main"
 ultralytics-actions-info = "actions.utils:ultralytics_actions_info"
+ultralytics-actions-check-cla = "actions.check_cla:main"
 
 [tool.setuptools]
 packages = { find = { where = ["."], include = ["actions", "actions.*"] } }

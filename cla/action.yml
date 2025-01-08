@@ -1,0 +1,76 @@
+# Ultralytics Actions 🚀, AGPL-3.0 License https://ultralytics.com/license
+
+name: "Ultralytics CLA"
+description: "Checks if contributors have signed the Ultralytics Contributor License Agreement"
+inputs:
+  github-token:
+    description: "GitHub token"
+    required: true
+  cla_repository:
+    description: "GitHub repository name for storing CLA signatures (including organization, e.g., 'org/repo')"
+    required: true
+  cla_branch:
+    description: "Branch to store CLA signatures"
+    required: true
+    default: "cla-signatures"
+  cla_signatures_path:
+    description: "Path to the JSON file containing CLA signatures"
+    required: true
+    default: "signatures/version1/cla.json"
+  cla_document_url:
+    description: "URL to the CLA document"
+    required: true
+    default: "https://docs.ultralytics.com/help/CLA"
+  allowlist:
+    description: "Comma-separated list of users/bots to ignore"
+    required: false
+    default: "dependabot[bot],github-actions,bot*"
+  sign_comment:
+    description: "Comment to trigger CLA signing"
+    required: true
+    default: "I have read the CLA Document and I sign the CLA"
+  allsigned_comment:
+    description: "Comment to post when all contributors have signed"
+    required: true
+    default: "All Contributors have signed the CLA. ✅"
+  openai_api_key:
+    description: "OpenAI API Key"
+    required: false
+  openai_model:
+    description: "OpenAI Model"
+    required: false
+    default: "gpt-4o"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip wheel
+        pip install -q git+https://github.com/ultralytics/actions@cla-branch
+        # pip install -q ultralytics-actions
+        ultralytics-actions-info
+      shell: bash
+
+    - name: Check CLA
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        CLA_REPOSITORY: ${{ inputs.cla_repository }}
+        CLA_BRANCH: ${{ inputs.cla_branch }}
+        CLA_SIGNATURES_PATH: ${{ inputs.cla_signatures_path }}
+        CLA_DOCUMENT_URL: ${{ inputs.cla_document_url }}
+        ALLOWLIST: ${{ inputs.allowlist }}
+        SIGN_COMMENT: ${{ inputs.sign_comment }}
+        ALLSIGNED_COMMENT: ${{ inputs.allsigned_comment }}
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        OPENAI_MODEL: ${{ inputs.openai_model }}
+      run: ultralytics-actions-check-cla
+      shell: bash
