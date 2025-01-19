@@ -1,11 +1,10 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
+import asyncio
 import re
-import time
-from concurrent.futures import ThreadPoolExecutor
 from urllib import parse
 
-import requests
+import aiohttp
 
 REQUESTS_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
@@ -70,8 +69,8 @@ def clean_url(url):
     return url
 
 
-def is_url(url, session=None, check=True, max_attempts=3, timeout=2):
-    """Check if string is URL and optionally verify it exists."""
+async def is_url_async(url, session, check=True, max_attempts=3, timeout=2):
+    """Asynchronously check if string is URL and optionally verify it exists."""
     try:
         # Check allow list
         if any(x in url for x in URL_IGNORE_LIST):
@@ -84,31 +83,29 @@ def is_url(url, session=None, check=True, max_attempts=3, timeout=2):
             return False
 
         if check:
-            requester = session or requests
             bad_codes = {404, 410, 500, 502, 503, 504}
-            kwargs = {"timeout": timeout, "allow_redirects": True}
-            if not session:
-                kwargs["headers"] = REQUESTS_HEADERS
+            kwargs = {"timeout": aiohttp.ClientTimeout(total=timeout)}
 
             for attempt in range(max_attempts):
                 try:
                     # Try HEAD first, then GET if needed
-                    for method in (requester.head, requester.get):
-                        if method(url, stream=method == requester.get, **kwargs).status_code not in bad_codes:
-                            return True
+                    for method in (session.head, session.get):
+                        async with method(url, **kwargs) as response:
+                            if response.status not in bad_codes:
+                                return True
                     return False
-                except Exception:
+                except (aiohttp.ClientError, asyncio.TimeoutError):
                     if attempt == max_attempts - 1:  # last attempt
                         return False
-                    time.sleep(2**attempt)  # exponential backoff
+                    await asyncio.sleep(2**attempt)  # exponential backoff
             return False
         return True
     except Exception:
         return False
 
 
-def check_links_in_string(text, verbose=True, return_bad=False):
-    """Process a given text, find unique URLs within it, and check for any 404 errors."""
+async def check_links_in_string_async(text, verbose=True, return_bad=False):
+    """Asynchronously process a given text, find unique URLs within it, and check for any 404 errors."""
     all_urls = []
     for md_text, md_url, plain_url in URL_PATTERN.findall(text):
         url = md_url or plain_url
@@ -116,9 +113,11 @@ def check_links_in_string(text, verbose=True, return_bad=False):
             all_urls.append(url)
 
     urls = set(map(clean_url, all_urls))  # remove extra characters and make unique
-    with requests.Session() as session, ThreadPoolExecutor(max_workers=16) as executor:
-        session.headers.update(REQUESTS_HEADERS)
-        bad_urls = [url for url, valid in zip(urls, executor.map(lambda x: not is_url(x, session), urls)) if valid]
+
+    async with aiohttp.ClientSession(headers=REQUESTS_HEADERS) as session:
+        tasks = [is_url_async(url, session) for url in urls]
+        results = await asyncio.gather(*tasks)
+        bad_urls = [url for url, valid in zip(urls, results) if not valid]
 
     passing = not bad_urls
     if verbose and not passing:
@@ -127,5 +126,20 @@ def check_links_in_string(text, verbose=True, return_bad=False):
     return (passing, bad_urls) if return_bad else passing
 
 
+async def main():
+    # Example usage
+    passing, bad_urls = await check_links_in_string_async(
+        "Check out https://ultralytics.com/images/bus.jpg and this non-existent link https://ultralytics.com/invalid"
+    )
+    print(f"Passing: {passing}")
+    if not passing:
+        print(f"Bad URLs: {bad_urls}")
+
+    # Test is_url_async directly
+    async with aiohttp.ClientSession() as session:
+        result = await is_url_async("https://ultralytics.com/images/bus.jpg", session)
+        print(f"Is valid URL: {result}")
+
+
 if __name__ == "__main__":
-    print(is_url("https://ultralytics.com/images/bus.jpg"))
+    asyncio.run(main())

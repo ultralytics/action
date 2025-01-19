@@ -68,6 +68,7 @@ dependencies = [
     "requests>=2.32.3",
     "ruff>=0.9.1",
     "docformatter>=1.7.5",
+    "aiohttp>=3.11.11",
 ]
 
 [project.optional-dependencies]
